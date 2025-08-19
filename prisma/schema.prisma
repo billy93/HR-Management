@@ -1,0 +1,344 @@
+// This is your Prisma schema file for Small Business HR (SBHR) system
+// Based on the comprehensive PRD for HR management
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum UserRole {
+  ADMIN
+  HR
+  MANAGER
+  EMPLOYEE
+}
+
+enum EmploymentType {
+  FULLTIME
+  PARTTIME
+  CONTRACT
+  INTERN
+}
+
+enum AttendanceType {
+  CLOCK_IN
+  CLOCK_OUT
+}
+
+enum LeaveStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELED
+}
+
+enum PayrollRunStatus {
+  DRAFT
+  LOCKED
+  PAID
+}
+
+enum TimesheetStatus {
+  DRAFT
+  POSTED
+  APPROVED
+}
+
+enum PayrollItemType {
+  EARNING
+  DEDUCTION
+}
+
+// Core Models
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  hashedPwd String?
+  role      UserRole @default(EMPLOYEE)
+  employee  Employee?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  locations Location[]
+  employees Employee[]
+  payroll   PayrollRun[]
+  holidays  Holiday[]
+  workSchedules WorkSchedule[]
+  leaveTypes LeaveType[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Location {
+  id        String   @id @default(cuid())
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId String
+  name      String
+  departments Department[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Department {
+  id         String    @id @default(cuid())
+  location   Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId String
+  name       String
+  employees  Employee[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model JobTitle {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  employees Employee[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model JobLevel {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  rank      Int
+  employees Employee[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Employee {
+  id           String      @id @default(cuid())
+  user         User?       @relation(fields: [userId], references: [id])
+  userId       String?     @unique
+  company      Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId    String
+  department   Department? @relation(fields: [departmentId], references: [id])
+  departmentId String?
+  jobTitle     JobTitle?   @relation(fields: [jobTitleId], references: [id])
+  jobTitleId   String?
+  jobLevel     JobLevel?   @relation(fields: [jobLevelId], references: [id])
+  jobLevelId   String?
+  firstName    String
+  lastName     String
+  email        String      @unique
+  phone        String?
+  startDate    DateTime
+  endDate      DateTime?
+  employment   Employment?
+  attendance   AttendanceLog[]
+  timesheets   Timesheet[]
+  leaves       LeaveRequest[]
+  payslips     Payslip[]
+  payrollItems PayrollItem[]
+  leaveBalances LeaveBalance[]
+  managerId    String?
+  manager      Employee?   @relation("EmployeeManager", fields: [managerId], references: [id])
+  directReports Employee[] @relation("EmployeeManager")
+  leaveApprovals LeaveApproval[]
+  approvedLeaves LeaveRequest[] @relation("LeaveApprover")
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+model Employment {
+  id          String         @id @default(cuid())
+  employee    Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId  String         @unique
+  type        EmploymentType
+  baseSalary  Decimal
+  payGrade    String?
+  paySchedule String?
+  bankAccount String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+// Work Rules
+model WorkSchedule {
+  id        String   @id @default(cuid())
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId String
+  name      String
+  timezone  String   @default("Asia/Jakarta")
+  shifts    Shift[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Shift {
+  id         String       @id @default(cuid())
+  schedule   WorkSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  scheduleId String
+  name       String
+  startTime  String
+  endTime    String
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model Holiday {
+  id        String   @id @default(cuid())
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId String
+  date      String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Attendance
+model AttendanceLog {
+  id          String         @id @default(cuid())
+  employee    Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId  String
+  eventTime   DateTime
+  type        AttendanceType
+  notes       String?
+  source      String?
+  createdAt   DateTime       @default(now())
+}
+
+model Timesheet {
+  id         String          @id @default(cuid())
+  employee   Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId String
+  date       String
+  workHours  Decimal
+  overtime   Decimal
+  status     TimesheetStatus @default(POSTED)
+  @@unique([employeeId, date])
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+}
+
+// Leave Management
+model LeaveType {
+  id        String   @id @default(cuid())
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId String
+  name      String
+  accrual   Boolean  @default(true)
+  defaultDays Int    @default(12)
+  requests  LeaveRequest[]
+  balances  LeaveBalance[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model LeaveBalance {
+  id          String    @id @default(cuid())
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId  String
+  leaveType   LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+  leaveTypeId String
+  balanceDays Decimal
+  periodStart String
+  periodEnd   String
+  @@unique([employeeId, leaveTypeId, periodStart, periodEnd])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model LeaveRequest {
+  id          String      @id @default(cuid())
+  employee    Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId  String
+  leaveType   LeaveType   @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+  leaveTypeId String
+  startDate   String
+  endDate     String
+  days        Decimal
+  reason      String?
+  status      LeaveStatus @default(PENDING)
+  approverId  String?
+  approver    Employee?   @relation("LeaveApprover", fields: [approverId], references: [id])
+  approvals   LeaveApproval[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model LeaveApproval {
+  id           String      @id @default(cuid())
+  leaveRequest LeaveRequest @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
+  leaveRequestId String
+  approver     Employee    @relation(fields: [approverId], references: [id])
+  approverId   String
+  status       LeaveStatus
+  comments     String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+// Payroll
+model PayrollRun {
+  id         String           @id @default(cuid())
+  company    Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId  String
+  period     String
+  status     PayrollRunStatus @default(DRAFT)
+  items      PayrollItem[]
+  payslips   Payslip[]
+  @@unique([companyId, period])
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+}
+
+model PayrollItem {
+  id           String          @id @default(cuid())
+  payrollRun   PayrollRun      @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  payrollRunId String
+  employee     Employee        @relation(fields: [employeeId], references: [id])
+  employeeId   String
+  name         String
+  type         PayrollItemType
+  amount       Decimal
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+model Payslip {
+  id          String     @id @default(cuid())
+  payrollRun  PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  payrollRunId String
+  employee    Employee   @relation(fields: [employeeId], references: [id])
+  employeeId  String
+  grossPay    Decimal
+  deductions  Decimal
+  netPay      Decimal
+  publishedAt DateTime?
+  paidAt      DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+// Audit & Admin
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorUserId String
+  action     String
+  entity     String
+  entityId   String
+  before     Json?
+  after      Json?
+  createdAt  DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
