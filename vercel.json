@@ -1,20 +1,13 @@
 {
-  "version": 2,
   "buildCommand": "prisma generate && next build",
-  "outputDirectory": ".next",
+  "installCommand": "npm install",
   "framework": "nextjs",
   "functions": {
     "src/app/api/**/*.ts": {
-      "runtime": "nodejs18.x"
+      "maxDuration": 30
     }
   },
   "env": {
-    "NODE_ENV": "production"
-  },
-  "build": {
-    "env": {
-      "PRISMA_GENERATE_SKIP_AUTOINSTALL": "true"
-    }
-  },
-  "installCommand": "npm install && npx prisma generate"
+    "PRISMA_GENERATE_DATAPROXY": "true"
+  }
 }
