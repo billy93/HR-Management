@@ -20,7 +20,9 @@ import {
   Briefcase,
   User,
   FileText,
-  LogOut
+  LogOut,
+  ChevronDown,
+  ChevronRight
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
@@ -79,9 +81,11 @@ const navigation = [
 interface SidebarProps {
   className?: string
   userRole: string
+  collapsedMenus: Record<string, boolean>
+  toggleMenu: (menuName: string) => void
 }
 
-function Sidebar({ className, userRole }: SidebarProps) {
+function Sidebar({ className, userRole, collapsedMenus, toggleMenu }: SidebarProps) {
   const pathname = usePathname()
 
   const filterNavByRole = (items: any[]) => {
@@ -93,22 +97,35 @@ function Sidebar({ className, userRole }: SidebarProps) {
       const isActive = pathname === item.href
       const hasChildren = item.children && item.children.length > 0
       const filteredChildren = hasChildren ? filterNavByRole(item.children) : []
+      const isCollapsed = collapsedMenus[item.name] || false
 
       if (hasChildren && filteredChildren.length > 0) {
         const IconComponent = item.icon
         return (
           <div key={item.name} className="space-y-1">
-            <div className={cn(
-              "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors",
-              level === 0 ? "text-muted-foreground" : "text-muted-foreground/70",
-              isActive && "bg-primary text-primary-foreground"
-            )}>
-              {IconComponent && <IconComponent className="h-4 w-4" />}
-              <span>{item.name}</span>
-            </div>
-            <div className={cn("ml-4 space-y-1", level > 0 && "ml-8")}>
-              <NavItems items={filteredChildren} level={level + 1} />
-            </div>
+            <button
+              onClick={() => toggleMenu(item.name)}
+              className={cn(
+                "w-full flex items-center justify-between gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+                level === 0 ? "text-muted-foreground" : "text-muted-foreground/70",
+                isActive && "bg-primary text-primary-foreground"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                {IconComponent && <IconComponent className="h-4 w-4" />}
+                <span>{item.name}</span>
+              </div>
+              {isCollapsed ? (
+                <ChevronRight className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
+            </button>
+            {!isCollapsed && (
+              <div className={cn("ml-4 space-y-1", level > 0 && "ml-8")}>
+                <NavItems items={filteredChildren} level={level + 1} />
+              </div>
+            )}
           </div>
         )
       }
@@ -160,14 +177,47 @@ interface MainLayoutProps {
 
 export function MainLayout({ children, userRole }: MainLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [collapsedMenus, setCollapsedMenus] = useState<Record<string, boolean>>({})
   const { toast } = useToast()
 
-  const handleLogout = () => {
-    toast({
-      title: "Logged out",
-      description: "You have been successfully logged out.",
-    })
-    // In a real app, you would redirect to login page
+  const toggleMenu = (menuName: string) => {
+    setCollapsedMenus(prev => ({
+      ...prev,
+      [menuName]: !prev[menuName]
+    }))
+  }
+
+  const handleLogout = async () => {
+    try {
+      // Call logout API to clear session
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      
+      // Clear client-side session
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('hr-session')
+        localStorage.removeItem('hr-session')
+      }
+      
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out.",
+      })
+      
+      // Redirect to home page
+      window.location.href = '/'
+    } catch (error) {
+      console.error('Logout error:', error)
+      toast({
+        title: "Error",
+        description: "Failed to logout. Please try again.",
+        variant: "destructive"
+      })
+    }
   }
 
   return (
@@ -175,14 +225,14 @@ export function MainLayout({ children, userRole }: MainLayoutProps) {
       {/* Desktop Sidebar */}
       <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0">
         <div className="flex flex-col flex-grow bg-card border-r pt-5 overflow-y-auto">
-          <Sidebar userRole={userRole} />
+          <Sidebar userRole={userRole} collapsedMenus={collapsedMenus} toggleMenu={toggleMenu} />
         </div>
       </div>
 
       {/* Mobile Sidebar */}
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent side="left" className="p-0 w-64">
-          <Sidebar userRole={userRole} />
+          <Sidebar userRole={userRole} collapsedMenus={collapsedMenus} toggleMenu={toggleMenu} />
         </SheetContent>
       </Sheet>
 

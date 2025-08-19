@@ -26,8 +26,10 @@ import {
   Filter
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { MainLayout } from '@/components/layout/main-layout'
 
 export default function ReportsPage() {
+  const [userRole] = useState("ADMIN")
   const { toast } = useToast()
   const [dateRange, setDateRange] = useState<{
     from: Date | undefined
@@ -235,7 +237,8 @@ export default function ReportsPage() {
   const summary = getReportSummary()
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <MainLayout userRole={userRole}>
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
@@ -504,6 +507,7 @@ export default function ReportsPage() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </MainLayout>
   )
 }
